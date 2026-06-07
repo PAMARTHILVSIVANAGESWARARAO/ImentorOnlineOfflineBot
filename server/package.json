@@ -4,10 +4,10 @@
   "type": "module",
   "main": "src/server.ts",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
+    "dev": "NODE_OPTIONS='--dns-result-order=ipv4first' tsx watch src/server.ts",
+    "start": "NODE_OPTIONS='--dns-result-order=ipv4first' tsx src/server.ts",
     "build": "tsc",
-    "node": "tsx src/server.ts"
+    "node": "NODE_OPTIONS='--dns-result-order=ipv4first' tsx src/server.ts"
   },
   "dependencies": {
     "express": "^4.21.2",

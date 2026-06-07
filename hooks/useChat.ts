@@ -23,36 +23,41 @@ export const useChat = (offlineChat?: OfflineChatRuntime) => {
     return words.length <= 5 ? content.trim() : `${words.slice(0, 5).join(' ')}...`;
   };
   
+  const loadOfflineConversations = async () => {
+    const queue = await getQueue();
+    const offlineConversations = queue.map((entry) => {
+      const lastMessage = entry.messages[entry.messages.length - 1];
+      const firstMessage = entry.messages[0];
+
+      return {
+        _id: entry.conversationId,
+        title: entry.conversationTitle || 'Offline Conversation',
+        createdAt: firstMessage?.createdAt ?? new Date().toISOString(),
+        updatedAt: lastMessage?.createdAt ?? new Date().toISOString(),
+      };
+    });
+    store.setConversations(offlineConversations);
+  };
+
   const loadConversations = async () => {
     try {
       if (!store.isConnected) {
-        const queue = await getQueue();
-        const offlineConversations = queue.map((entry) => {
-          const lastMessage = entry.messages[entry.messages.length - 1];
-          const firstMessage = entry.messages[0];
-
-          return {
-            _id: entry.conversationId,
-            title: entry.conversationTitle || 'Offline Conversation',
-            createdAt: firstMessage?.createdAt ?? new Date().toISOString(),
-            updatedAt: lastMessage?.createdAt ?? new Date().toISOString(),
-          };
-        });
-        store.setConversations(offlineConversations);
+        await loadOfflineConversations();
         return;
       }
 
       const convs = await apiService.fetchConversations();
       store.setConversations(convs);
     } catch (err) {
-      console.error('Failed to load conversations:', err);
+      console.log('Failed to load conversations online, falling back to offline list:', err);
+      await loadOfflineConversations();
     }
   };
 
   const selectConversation = async (conversation: Conversation) => {
     try {
       store.setActiveConversation(conversation);
-      if (!store.isConnected && conversation._id.startsWith('offline-')) {
+      if (!store.isConnected || conversation._id.startsWith('offline-')) {
         const queue = await getQueue();
         const entry = queue.find((item) => item.conversationId === conversation._id);
         store.setMessages(
@@ -70,24 +75,40 @@ export const useChat = (offlineChat?: OfflineChatRuntime) => {
       const msgs = await apiService.fetchMessages(conversation._id);
       store.setMessages(msgs);
     } catch (err) {
-      console.error('Failed to load messages for conversation:', err);
+      console.log('Failed to load messages online, attempting offline fallback:', err);
+      const queue = await getQueue();
+      const entry = queue.find((item) => item.conversationId === conversation._id);
+      if (entry) {
+        store.setMessages(
+          entry.messages.map((message) => ({
+            conversationId: conversation._id,
+            role: message.role,
+            content: message.content,
+            createdAt: message.createdAt,
+          }))
+        );
+      }
     }
+  };
+
+  const createOfflineChat = (): Conversation => {
+    const now = new Date();
+    const conv: Conversation = {
+      _id: `offline-${Date.now()}`,
+      title: 'New Conversation',
+      createdAt: now,
+      updatedAt: now,
+    };
+    store.setConversations([conv, ...store.conversations]);
+    store.setActiveConversation(conv);
+    store.setMessages([]);
+    return conv;
   };
 
   const createNewChat = async (): Promise<Conversation | null> => {
     try {
       if (!store.isConnected) {
-        const now = new Date();
-        const conv: Conversation = {
-          _id: `offline-${Date.now()}`,
-          title: 'New Conversation',
-          createdAt: now,
-          updatedAt: now,
-        };
-        store.setConversations([conv, ...store.conversations]);
-        store.setActiveConversation(conv);
-        store.setMessages([]);
-        return conv;
+        return createOfflineChat();
       }
 
       const conv = await apiService.createConversation();
@@ -95,8 +116,8 @@ export const useChat = (offlineChat?: OfflineChatRuntime) => {
       await selectConversation(conv);
       return conv;
     } catch (err) {
-      console.error('Failed to create new conversation:', err);
-      return null;
+      console.log('Failed to create new conversation online, falling back to offline:', err);
+      return createOfflineChat();
     }
   };
 
@@ -132,20 +153,28 @@ export const useChat = (offlineChat?: OfflineChatRuntime) => {
       if (!conversation) return;
     }
 
+    let sendSuccess = false;
     if (store.isConnected) {
-      if (conversation._id.startsWith('offline-')) {
-        const synced = await syncQueuedConversation(conversation._id);
-        if (!synced) {
-          conversation = await createNewChat();
-          if (!conversation) return;
-        } else {
-          conversation = synced.remoteConversation;
+      try {
+        if (conversation._id.startsWith('offline-')) {
+          const synced = await syncQueuedConversation(conversation._id);
+          if (!synced) {
+            conversation = await createNewChat();
+            if (!conversation) return;
+          } else {
+            conversation = synced.remoteConversation;
+          }
         }
-      }
 
-      // Online mode: Stream response
-      await streamService.sendMessageStream(conversation._id, content);
-    } else {
+        // Online mode: Stream response
+        await streamService.sendMessageStream(conversation._id, content);
+        sendSuccess = true;
+      } catch (err) {
+        console.log('Online stream failed, falling back to offline model:', err);
+      }
+    }
+
+    if (!sendSuccess) {
       const conversationId = conversation._id;
       const now = new Date();
       const userMessage: Message = {
