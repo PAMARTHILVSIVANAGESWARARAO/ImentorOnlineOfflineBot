@@ -1,21 +1,25 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { LLAMA3_2_1B_SPINQUANT, useLLM } from 'react-native-executorch';
-import { getModelPath } from '../services/modelDownload.service';
+import { getModelPath, getTokenizerPath, getTokenizerConfigPath } from '../services/modelDownload.service';
 import { useChatStore } from '../store/chat.store';
 
 export const useOfflineChat = () => {
   const offlineModelReady = useChatStore((state) => state.offlineModelReady);
+  const isConnected = useChatStore((state) => state.isConnected);
   const readyRef = useRef(false);
   const errorRef = useRef<unknown>(null);
   const localModel = useMemo(
     () => ({
       ...LLAMA3_2_1B_SPINQUANT,
       modelSource: getModelPath(),
+      tokenizerSource: getTokenizerPath(),
+      tokenizerConfigSource: getTokenizerConfigPath(),
     }),
     []
   );
 
-  const llm = useLLM({ model: localModel, preventLoad: !offlineModelReady });
+  const preventLoad = !offlineModelReady || isConnected;
+  const llm = useLLM({ model: localModel, preventLoad });
 
   useEffect(() => {
     readyRef.current = llm.isReady;
