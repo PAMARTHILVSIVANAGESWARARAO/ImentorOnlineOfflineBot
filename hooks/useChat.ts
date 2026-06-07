@@ -4,6 +4,7 @@ import { apiService } from '../services/api.service';
 import { streamService } from '../services/stream.service';
 import { Conversation, Message } from '../types/chat.types';
 import { getQueue, queueConversation, removeFromQueue } from '../services/offlineQueue.service';
+import { syncQueuedConversation } from '../services/sync.service';
 import { OfflineChatRuntime } from './useOfflineChat';
 
 export const useChat = (offlineChat?: OfflineChatRuntime) => {
@@ -132,6 +133,16 @@ export const useChat = (offlineChat?: OfflineChatRuntime) => {
     }
 
     if (store.isConnected) {
+      if (conversation._id.startsWith('offline-')) {
+        const synced = await syncQueuedConversation(conversation._id);
+        if (!synced) {
+          conversation = await createNewChat();
+          if (!conversation) return;
+        } else {
+          conversation = synced.remoteConversation;
+        }
+      }
+
       // Online mode: Stream response
       await streamService.sendMessageStream(conversation._id, content);
     } else {

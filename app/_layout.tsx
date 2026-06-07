@@ -1,11 +1,17 @@
 import { Stack } from "expo-router";
 import { ThemeProvider, DarkTheme } from "@react-navigation/native";
 import { useEffect } from 'react';
+import { initExecutorch } from 'react-native-executorch';
+import { ExpoResourceFetcher } from 'react-native-executorch-expo-resource-fetcher';
 import { initNetworkMonitoring } from '../services/network.service';
 import { isModelDownloaded, getModelPath, getModelInfo, MODEL_VERSION } from '../services/modelDownload.service';
 import { useChatStore } from '../store/chat.store';
 import { useSyncQueue } from '../hooks/useSyncQueue';
 import "./globals.css";
+
+initExecutorch({
+  resourceFetcher: ExpoResourceFetcher,
+});
 
 export default function RootLayout() {
   useSyncQueue();
