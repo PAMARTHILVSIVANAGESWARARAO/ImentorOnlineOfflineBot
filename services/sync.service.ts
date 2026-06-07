@@ -89,7 +89,7 @@ export const syncOfflineQueue = async (): Promise<void> => {
             currentStore.setMessages(synced.remoteMessages);
           }
         } catch (error) {
-          console.error(`Failed to sync offline conversation ${entry.conversationId}:`, error);
+          console.log(`Failed to sync offline conversation ${entry.conversationId}:`, error);
         }
       })
     );
@@ -98,7 +98,7 @@ export const syncOfflineQueue = async (): Promise<void> => {
       const conversations = await apiService.fetchConversations();
       useChatStore.getState().setConversations(conversations);
     } catch (error) {
-      console.error('Failed to refresh conversations after sync:', error);
+      console.log('Failed to refresh conversations after sync:', error);
     }
   } finally {
     useChatStore.getState().setSyncing(false);

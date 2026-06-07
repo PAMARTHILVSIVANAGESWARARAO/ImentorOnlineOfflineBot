@@ -9,6 +9,7 @@ interface ChatStore {
   messages: Message[];
   isConnected: boolean;
   offlineModelReady: boolean;
+  offlineModelIncompatible: boolean;
   modelPath: string | null;
   modelVersion: string | null;
   modelSize: number | null;
@@ -22,6 +23,7 @@ interface ChatStore {
   // Actions
   setConnected: (connected: boolean) => void;
   setOfflineModelReady: (ready: boolean) => void;
+  setOfflineModelIncompatible: (incompatible: boolean) => void;
   setModelMetadata: (metadata: {
     modelPath: string;
     modelVersion: string;
@@ -49,6 +51,7 @@ export const useChatStore = create<ChatStore>()(
       messages: [],
       isConnected: true,
       offlineModelReady: false,
+      offlineModelIncompatible: false,
       modelPath: null,
       modelVersion: null,
       modelSize: null,
@@ -61,10 +64,12 @@ export const useChatStore = create<ChatStore>()(
 
       setConnected: (connected) => set({ isConnected: connected }),
       setOfflineModelReady: (ready) => set({ offlineModelReady: ready }),
+      setOfflineModelIncompatible: (incompatible) => set({ offlineModelIncompatible: incompatible }),
       setModelMetadata: (metadata) => set(metadata),
       resetModelMetadata: () =>
         set({
           offlineModelReady: false,
+          offlineModelIncompatible: false,
           modelPath: null,
           modelVersion: null,
           modelSize: null,
@@ -86,6 +91,7 @@ export const useChatStore = create<ChatStore>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         offlineModelReady: state.offlineModelReady,
+        offlineModelIncompatible: state.offlineModelIncompatible,
         modelPath: state.modelPath,
         modelVersion: state.modelVersion,
         modelSize: state.modelSize,
