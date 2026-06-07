@@ -20,7 +20,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
       className={`flex flex-row my-2 px-4 ${isUser ? 'justify-end' : 'justify-start'}`}
     >
       <View 
-        className={`max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm ${
+        className={`max-w-[100%] rounded-2xl px-4 py-2.5 shadow-sm ${
           isUser 
             ? 'bg-emerald-600 rounded-tr-none' 
             : 'bg-zinc-800 rounded-tl-none border border-zinc-700/20'

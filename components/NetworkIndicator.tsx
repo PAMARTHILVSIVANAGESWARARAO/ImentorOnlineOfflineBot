@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { useNetwork } from '../hooks/useNetwork';
+import { useChatStore } from '../store/chat.store';
 
 export const NetworkIndicator = () => {
   const isConnected = useNetwork();
+  const syncing = useChatStore((state) => state.syncing);
 
   return (
     <View
@@ -34,7 +36,7 @@ export const NetworkIndicator = () => {
           color: isConnected ? '#34d399' : '#f87171',
         }}
       >
-        {isConnected ? 'Online' : 'Offline'}
+        {syncing ? 'Syncing...' : isConnected ? 'Online' : 'Offline'}
       </Text>
     </View>
   );

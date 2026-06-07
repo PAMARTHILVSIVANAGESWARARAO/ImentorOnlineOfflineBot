@@ -9,7 +9,12 @@ interface ChatStore {
   messages: Message[];
   isConnected: boolean;
   offlineModelReady: boolean;
+  modelPath: string | null;
+  modelVersion: string | null;
+  modelSize: number | null;
+  downloadedAt: string | null;
   onboardingCompleted: boolean;
+  syncing: boolean;
   isStreaming: boolean;
   isThinking: boolean;
   streamingText: string;
@@ -17,7 +22,15 @@ interface ChatStore {
   // Actions
   setConnected: (connected: boolean) => void;
   setOfflineModelReady: (ready: boolean) => void;
+  setModelMetadata: (metadata: {
+    modelPath: string;
+    modelVersion: string;
+    modelSize: number;
+    downloadedAt: string;
+  }) => void;
+  resetModelMetadata: () => void;
   setOnboardingCompleted: (completed: boolean) => void;
+  setSyncing: (syncing: boolean) => void;
   setConversations: (conversations: Conversation[]) => void;
   setActiveConversation: (conversation: Conversation | null) => void;
   setMessages: (messages: Message[]) => void;
@@ -36,14 +49,29 @@ export const useChatStore = create<ChatStore>()(
       messages: [],
       isConnected: true,
       offlineModelReady: false,
+      modelPath: null,
+      modelVersion: null,
+      modelSize: null,
+      downloadedAt: null,
       onboardingCompleted: false,
+      syncing: false,
       isStreaming: false,
       isThinking: false,
       streamingText: '',
 
       setConnected: (connected) => set({ isConnected: connected }),
       setOfflineModelReady: (ready) => set({ offlineModelReady: ready }),
+      setModelMetadata: (metadata) => set(metadata),
+      resetModelMetadata: () =>
+        set({
+          offlineModelReady: false,
+          modelPath: null,
+          modelVersion: null,
+          modelSize: null,
+          downloadedAt: null,
+        }),
       setOnboardingCompleted: (completed) => set({ onboardingCompleted: completed }),
+      setSyncing: (syncing) => set({ syncing }),
       setConversations: (conversations) => set({ conversations }),
       setActiveConversation: (activeConversation) => set({ activeConversation }),
       setMessages: (messages) => set({ messages }),
@@ -58,6 +86,10 @@ export const useChatStore = create<ChatStore>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         offlineModelReady: state.offlineModelReady,
+        modelPath: state.modelPath,
+        modelVersion: state.modelVersion,
+        modelSize: state.modelSize,
+        downloadedAt: state.downloadedAt,
         onboardingCompleted: state.onboardingCompleted,
       }),
     }

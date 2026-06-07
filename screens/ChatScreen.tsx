@@ -7,16 +7,18 @@ import { ChatHeader } from '../components/ChatHeader';
 import { ChatInput } from '../components/ChatInput';
 import { TypingIndicator } from '../components/TypingIndicator';
 import { useChat } from '../hooks/useChat';
+import { useOfflineChat } from '../hooks/useOfflineChat';
 
 export const ChatScreen = () => {
   const insets = useSafeAreaInsets();
+  const offlineChat = useOfflineChat();
   const { 
     messages, 
     isStreaming, 
     isThinking, 
     streamingText, 
     sendMessage 
-  } = useChat();
+  } = useChat(offlineChat);
 
   const flatListRef = useRef<FlatList>(null);
 

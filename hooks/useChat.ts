@@ -1,13 +1,46 @@
+import { useEffect } from 'react';
 import { useChatStore } from '../store/chat.store';
 import { apiService } from '../services/api.service';
 import { streamService } from '../services/stream.service';
 import { Conversation, Message } from '../types/chat.types';
+import { getQueue, queueConversation, removeFromQueue } from '../services/offlineQueue.service';
+import { OfflineChatRuntime } from './useOfflineChat';
 
-export const useChat = () => {
+export const useChat = (offlineChat?: OfflineChatRuntime) => {
   const store = useChatStore();
+  const isGenerating = offlineChat?.isGenerating ?? false;
+  const partialResponse = offlineChat?.partialResponse ?? '';
+
+  useEffect(() => {
+    if (!store.isConnected && store.offlineModelReady && isGenerating) {
+      store.setStreamingText(partialResponse);
+    }
+  }, [isGenerating, partialResponse, store.isConnected, store.offlineModelReady]);
+
+  const buildOfflineTitle = (content: string) => {
+    const words = content.trim().split(/\s+/).filter(Boolean);
+    return words.length <= 5 ? content.trim() : `${words.slice(0, 5).join(' ')}...`;
+  };
   
   const loadConversations = async () => {
     try {
+      if (!store.isConnected) {
+        const queue = await getQueue();
+        const offlineConversations = queue.map((entry) => {
+          const lastMessage = entry.messages[entry.messages.length - 1];
+          const firstMessage = entry.messages[0];
+
+          return {
+            _id: entry.conversationId,
+            title: entry.conversationTitle || 'Offline Conversation',
+            createdAt: firstMessage?.createdAt ?? new Date().toISOString(),
+            updatedAt: lastMessage?.createdAt ?? new Date().toISOString(),
+          };
+        });
+        store.setConversations(offlineConversations);
+        return;
+      }
+
       const convs = await apiService.fetchConversations();
       store.setConversations(convs);
     } catch (err) {
@@ -18,6 +51,21 @@ export const useChat = () => {
   const selectConversation = async (conversation: Conversation) => {
     try {
       store.setActiveConversation(conversation);
+      if (!store.isConnected && conversation._id.startsWith('offline-')) {
+        const queue = await getQueue();
+        const entry = queue.find((item) => item.conversationId === conversation._id);
+        store.setMessages(
+          entry
+            ? entry.messages.map((message) => ({
+                conversationId: conversation._id,
+                role: message.role,
+                content: message.content,
+                createdAt: message.createdAt,
+              }))
+            : store.messages.filter((msg) => msg.conversationId === conversation._id)
+        );
+        return;
+      }
       const msgs = await apiService.fetchMessages(conversation._id);
       store.setMessages(msgs);
     } catch (err) {
@@ -27,6 +75,20 @@ export const useChat = () => {
 
   const createNewChat = async (): Promise<Conversation | null> => {
     try {
+      if (!store.isConnected) {
+        const now = new Date();
+        const conv: Conversation = {
+          _id: `offline-${Date.now()}`,
+          title: 'New Conversation',
+          createdAt: now,
+          updatedAt: now,
+        };
+        store.setConversations([conv, ...store.conversations]);
+        store.setActiveConversation(conv);
+        store.setMessages([]);
+        return conv;
+      }
+
       const conv = await apiService.createConversation();
       await loadConversations();
       await selectConversation(conv);
@@ -39,6 +101,16 @@ export const useChat = () => {
 
   const deleteConversation = async (id: string) => {
     try {
+      if (!store.isConnected || id.startsWith('offline-')) {
+        store.setConversations(store.conversations.filter((conversation) => conversation._id !== id));
+        store.setMessages(store.messages.filter((message) => message.conversationId !== id));
+        await removeFromQueue(id);
+        if (store.activeConversation?._id === id) {
+          store.resetChat();
+        }
+        return;
+      }
+
       await apiService.deleteConversation(id);
       if (store.activeConversation?._id === id) {
         store.resetChat();
@@ -63,33 +135,90 @@ export const useChat = () => {
       // Online mode: Stream response
       await streamService.sendMessageStream(conversation._id, content);
     } else {
-      // Offline mode: Render offline messages locally without calling server
       const conversationId = conversation._id;
-      
-      // 1. Add user message
-      store.addMessage({
+      const now = new Date();
+      const userMessage: Message = {
         conversationId,
         role: 'user',
         content,
+        createdAt: now,
+      };
+      
+      store.addMessage(userMessage);
+
+      store.setThinking(true);
+      store.setStreaming(false);
+      store.setStreamingText('');
+
+      let replyContent = 'Network error. No offline model available.';
+
+      if (store.offlineModelReady) {
+        try {
+          if (!offlineChat) {
+            throw new Error('Offline chat runtime is not mounted.');
+          }
+
+          store.setStreaming(true);
+          replyContent = await offlineChat.sendOfflineMessage(content);
+        } catch (error: any) {
+          console.error('Offline inference failed:', error);
+          replyContent = `Offline model error: ${error.message || 'Unable to generate a response.'}`;
+        } finally {
+          store.setStreaming(false);
+          store.setStreamingText('');
+        }
+      }
+
+      const assistantMessage: Message = {
+        conversationId,
+        role: 'assistant',
+        content: replyContent,
         createdAt: new Date(),
+      };
+
+      store.addMessage(assistantMessage);
+      store.setThinking(false);
+
+      const conversationTitle =
+        conversation.title === 'New Conversation' ? buildOfflineTitle(content) : conversation.title;
+      const updatedConversation: Conversation = {
+        ...conversation,
+        title: conversationTitle,
+        updatedAt: new Date(),
+      };
+
+      store.setActiveConversation(updatedConversation);
+      store.setConversations([
+        updatedConversation,
+        ...store.conversations.filter((item) => item._id !== conversationId),
+      ]);
+
+      await queueConversation({
+        conversationId,
+        conversationTitle,
+        messages: [
+          {
+            role: 'user',
+            content: userMessage.content,
+            createdAt:
+              userMessage.createdAt instanceof Date
+                ? userMessage.createdAt.toISOString()
+                : userMessage.createdAt,
+          },
+          {
+            role: 'assistant',
+            content: assistantMessage.content,
+            createdAt:
+              assistantMessage.createdAt instanceof Date
+                ? assistantMessage.createdAt.toISOString()
+                : assistantMessage.createdAt,
+          },
+        ],
       });
 
-      // 2. Set thinking state to simulate offline processing/failure
-      store.setThinking(true);
-      
-      setTimeout(() => {
+      if (store.isThinking) {
         store.setThinking(false);
-        const replyContent = store.offlineModelReady
-          ? 'Offline model is ready to use.'
-          : 'Network error. No offline model available.';
-          
-        store.addMessage({
-          conversationId,
-          role: 'assistant',
-          content: replyContent,
-          createdAt: new Date(),
-        });
-      }, 1000);
+      }
     }
   };
 
@@ -103,7 +232,14 @@ export const useChat = () => {
     isStreaming: store.isStreaming,
     isThinking: store.isThinking,
     streamingText: store.streamingText,
+    syncing: store.syncing,
+    modelPath: store.modelPath,
+    modelVersion: store.modelVersion,
+    modelSize: store.modelSize,
+    downloadedAt: store.downloadedAt,
     setOfflineModelReady: store.setOfflineModelReady,
+    setModelMetadata: store.setModelMetadata,
+    resetModelMetadata: store.resetModelMetadata,
     setOnboardingCompleted: store.setOnboardingCompleted,
     resetChat: store.resetChat,
     loadConversations,

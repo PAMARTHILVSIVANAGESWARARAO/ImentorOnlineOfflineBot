@@ -4,6 +4,7 @@ import Animated, { FadeInDown, FadeInUp, Layout } from 'react-native-reanimated'
 import { useChat } from '../hooks/useChat';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { downloadModel } from '../services/modelDownload.service';
 
 export const OnboardingScreen = () => {
   const { setOfflineModelReady, setOnboardingCompleted } = useChat();
@@ -18,34 +19,31 @@ export const OnboardingScreen = () => {
     router.replace('/(tabs)' as any);
   };
 
-  const handleYes = () => {
+  const handleYes = async () => {
     setIsDownloading(true);
-    setStatusText('Downloading offline model files (1.2 GB)...');
+    setStatusText('Downloading offline model files...');
     setProgress(0);
 
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 1) {
-          clearInterval(interval);
-          setStatusText('Verifying checksums and loading model...');
-          setTimeout(() => {
-            setStatusText('Offline model loaded successfully!');
-            setTimeout(() => {
-              setOfflineModelReady(true);
-              setOnboardingCompleted(true);
-              router.replace('/(tabs)' as any);
-            }, 1000);
-          }, 1500);
-          return 1;
-        }
-        const step = Math.random() * 0.15;
-        const next = Math.min(1, prev + step);
-        if (next < 0.4) setStatusText('Downloading offline model files (1.2 GB)...');
-        else if (next < 0.7) setStatusText('Extracting model weights...');
-        else setStatusText('Compiling ExecuTorch binaries...');
-        return next;
-      });
-    }, 400);
+    const success = await downloadModel((nextProgress) => {
+      setProgress(nextProgress);
+      if (nextProgress < 1) {
+        setStatusText('Downloading offline model files...');
+      } else {
+        setStatusText('Verifying model file...');
+      }
+    });
+
+    if (success) {
+      setStatusText('Offline model downloaded successfully!');
+      setOfflineModelReady(true);
+      setOnboardingCompleted(true);
+      router.replace('/(tabs)' as any);
+      return;
+    }
+
+    setStatusText('Download failed. You can skip and try again from history.');
+    setOfflineModelReady(false);
+    setIsDownloading(false);
   };
 
   return (

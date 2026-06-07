@@ -21,12 +21,27 @@ export const apiService = {
     return response.json();
   },
 
-  async createConversation(): Promise<Conversation> {
+  async createConversation(title?: string): Promise<Conversation> {
     const response = await fetch(`${API_BASE_URL}/conversations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: title ? JSON.stringify({ title }) : undefined,
     });
     if (!response.ok) throw new Error(`Failed to create conversation: ${response.statusText}`);
+    return response.json();
+  },
+
+  async createMessage(
+    conversationId: string,
+    role: 'user' | 'assistant',
+    content: string
+  ): Promise<Message> {
+    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role, content }),
+    });
+    if (!response.ok) throw new Error(`Failed to create message: ${response.statusText}`);
     return response.json();
   },
 
