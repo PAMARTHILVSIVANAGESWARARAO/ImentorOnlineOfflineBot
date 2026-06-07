@@ -357,7 +357,20 @@ Message:
 - Deleting a conversation also deletes all messages for that conversation.
 
 
- npx expo install expo-dev-client
+npx expo install expo-dev-client
 npx expo prebuild
- npx expo run:android
- npx expo start --dev-client
+npx expo run:android
+npx expo start --dev-client
+
+
+run commands :
+terminal 1 : npm install 
+if suceessful install run `npx expo run:android`
+
+terminal 2 : cd sever 
+npm install
+npm start 
+
+terminal 3 : adb reverse tcp:5000 tcp:5000
+
+terminal 4 optional : scrcpy 
