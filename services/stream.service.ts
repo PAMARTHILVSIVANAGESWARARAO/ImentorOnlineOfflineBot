@@ -108,13 +108,7 @@ export const streamService = {
       store.setThinking(false);
       store.setStreaming(false);
       store.setStreamingText('');
-
-      store.addMessage({
-        conversationId,
-        role: 'assistant',
-        content: `⚠️ Connection Error: ${error.message || 'Could not reach the server. Make sure the backend is running and adb reverse is set up.'}`,
-        createdAt: new Date(),
-      });
+      throw error;
     }
   },
 };
