@@ -54,14 +54,9 @@ export const getModelInfo = async (): Promise<FileInfoWithSize> =>
 
 export const isModelDownloaded = async (): Promise<boolean> => {
   const modelInfo = await FileSystem.getInfoAsync(MODEL_URI);
-  const tokenizerInfo = await FileSystem.getInfoAsync(TOKENIZER_URI);
-  const configInfo = await FileSystem.getInfoAsync(TOKENIZER_CONFIG_URI);
-
-  return (
-    modelInfo.exists && (modelInfo.size ?? 0) > 0 &&
-    tokenizerInfo.exists && (tokenizerInfo.size ?? 0) > 0 &&
-    configInfo.exists && (configInfo.size ?? 0) > 0
-  );
+  // The Llama 3.2 1b SpinQuant model file is ~1.2 GB (1,273,831,680 bytes).
+  // We require it to be at least 1 GB to ensure it is complete.
+  return modelInfo.exists && (modelInfo.size ?? 0) > 1000 * 1024 * 1024;
 };
 
 export const deleteModel = async (): Promise<void> => {
@@ -92,18 +87,6 @@ export const downloadModel = async (
   onProgress: (progress: number) => void
 ): Promise<boolean> => {
   try {
-    if (await isModelDownloaded()) {
-      const info = await getModelInfo();
-      useChatStore.getState().setModelMetadata({
-        modelPath: MODEL_URI,
-        modelVersion: MODEL_VERSION,
-        modelSize: info.size ?? 0,
-        downloadedAt: new Date().toISOString(),
-      });
-      onProgress(1);
-      return true;
-    }
-
     await ensureModelDirectory();
     onProgress(0);
 
@@ -129,9 +112,9 @@ export const downloadModel = async (
       await tokenizerDownload.downloadAsync();
     }
 
-    // Download model binary if not exists
+    // Download model binary if not exists or incomplete (< 1 GB)
     const modelInfo = await FileSystem.getInfoAsync(MODEL_URI);
-    if (!modelInfo.exists || (modelInfo.size ?? 0) === 0) {
+    if (!modelInfo.exists || (modelInfo.size ?? 0) < 1000 * 1024 * 1024) {
       const download = FileSystem.createDownloadResumable(
         getRemoteModelUrl(),
         MODEL_URI,
@@ -149,6 +132,11 @@ export const downloadModel = async (
     
     const success = await isModelDownloaded();
     if (!success) {
+      // Clean up ONLY if model file is incomplete/corrupted
+      const checkInfo = await FileSystem.getInfoAsync(MODEL_URI);
+      if (checkInfo.exists && (checkInfo.size ?? 0) < 1000 * 1024 * 1024) {
+        await FileSystem.deleteAsync(MODEL_URI, { idempotent: true }).catch(() => {});
+      }
       useChatStore.getState().resetModelMetadata();
       return false;
     }
@@ -163,6 +151,11 @@ export const downloadModel = async (
     return true;
   } catch (error) {
     console.error('Model download failed:', error);
+    // Clean up ONLY if model file is incomplete/corrupted
+    const checkInfo = await FileSystem.getInfoAsync(MODEL_URI);
+    if (checkInfo.exists && (checkInfo.size ?? 0) < 1000 * 1024 * 1024) {
+      await FileSystem.deleteAsync(MODEL_URI, { idempotent: true }).catch(() => {});
+    }
     useChatStore.getState().resetModelMetadata();
     return false;
   }
