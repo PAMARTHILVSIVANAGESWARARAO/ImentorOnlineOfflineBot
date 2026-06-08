@@ -266,7 +266,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
         className={`rounded-2xl px-4 py-2.5 shadow-sm ${
           isUser
             ? 'bg-emerald-600 rounded-tr-none max-w-[85%]'
-            : 'bg-zinc-800/95 rounded-tl-none border border-zinc-700/30 w-full max-w-[88%]'
+            : 'bg-zinc-800/95 rounded-tl-none border border-zinc-700/30 w-full max-w-full'
         }`}
       >
         {isUser ? (

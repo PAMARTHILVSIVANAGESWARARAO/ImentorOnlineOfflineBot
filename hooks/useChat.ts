@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Alert } from 'react-native';
 import { useChatStore } from '../store/chat.store';
 import { apiService } from '../services/api.service';
 import { streamService } from '../services/stream.service';
@@ -175,22 +176,31 @@ export const useChat = (offlineChat?: OfflineChatRuntime) => {
     }
 
     if (!sendSuccess) {
+      if (!conversation) return;
       const conversationId = conversation._id;
-      const now = new Date();
+      
       const userMessage: Message = {
         conversationId,
         role: 'user',
         content,
-        createdAt: now,
+        createdAt: new Date(),
       };
-      
-      store.addMessage(userMessage);
+
+      // Prevent duplicate messages if already added in the streaming attempt
+      const wasAdded = store.messages.some(
+        (m) => m.conversationId === conversationId && m.role === 'user' && m.content === content
+      );
+
+      if (!wasAdded) {
+        store.addMessage(userMessage);
+      }
 
       store.setThinking(true);
       store.setStreaming(false);
       store.setStreamingText('');
 
-      let replyContent = 'Network error. No offline model available.';
+      let replyContent = '';
+      let hasOfflineError = false;
 
       if (store.offlineModelReady) {
         try {
@@ -203,10 +213,25 @@ export const useChat = (offlineChat?: OfflineChatRuntime) => {
         } catch (error: any) {
           console.error('Offline inference failed:', error);
           replyContent = `Offline model error: ${error.message || 'Unable to generate a response.'}`;
+          hasOfflineError = true;
         } finally {
           store.setStreaming(false);
           store.setStreamingText('');
         }
+      } else {
+        hasOfflineError = true;
+      }
+
+      if (hasOfflineError) {
+        store.setThinking(false);
+        Alert.alert(
+          'Connection Error',
+          'You are offline or the server is unreachable, and the offline model is not available on this device. Please check your connection or download the model from Chat History (top-right button) to chat offline.',
+          [{ text: 'OK' }]
+        );
+        // Clean up: Remove the unanswered user message from the messages array
+        store.setMessages(store.messages.filter((m) => !(m.conversationId === conversationId && m.role === 'user' && m.content === content)));
+        return;
       }
 
       const assistantMessage: Message = {
