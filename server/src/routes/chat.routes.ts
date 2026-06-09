@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
 import Conversation from '../models/Conversation.js';
 import Message from '../models/Message.js';
+import ResearchSession from '../models/ResearchSession.js';
+import ScrapedPage from '../models/ScrapedPage.js';
+import SessionChat from '../models/SessionChat.js';
 
 const router = Router();
 
@@ -64,6 +67,12 @@ router.delete('/conversations/:id', async (req: Request, res: Response) => {
   try {
     await Message.deleteMany({ conversationId: req.params.id });
     await Conversation.findByIdAndDelete(req.params.id);
+    
+    // Clean up corresponding Web Research database entries if they exist
+    await ResearchSession.findByIdAndDelete(req.params.id);
+    await ScrapedPage.deleteMany({ sessionId: req.params.id });
+    await SessionChat.deleteMany({ sessionId: req.params.id });
+
     res.json({ message: 'Conversation and messages deleted' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

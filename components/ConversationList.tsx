@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { useChat } from '../hooks/useChat';
+import { useChatStore } from '../store/chat.store';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Conversation } from '../types/chat.types';
 
@@ -10,6 +12,7 @@ interface ConversationListProps {
 
 export const ConversationList: React.FC<ConversationListProps> = ({ onSelect }) => {
   const { conversations, activeConversation, selectConversation, deleteConversation, createNewChat } = useChat();
+  const { setActiveResearchSession } = useChatStore();
 
   const handleDelete = (item: Conversation) => {
     Alert.alert(
@@ -42,8 +45,14 @@ export const ConversationList: React.FC<ConversationListProps> = ({ onSelect }) 
       >
         <TouchableOpacity
           onPress={() => {
-            selectConversation(item);
-            if (onSelect) onSelect();
+            if (item.title.startsWith('🔍 Research: ')) {
+              const topicName = item.title.replace('🔍 Research: ', '');
+              setActiveResearchSession(item._id, topicName);
+              router.replace('/(tabs)/research' as any);
+            } else {
+              selectConversation(item);
+              if (onSelect) onSelect();
+            }
           }}
           className="flex-1 px-4 py-3 flex flex-col"
         >

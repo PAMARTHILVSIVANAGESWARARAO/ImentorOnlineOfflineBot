@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import chatRoutes from './routes/chat.routes.js';
+import researchRoutes from './routes/research.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +22,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api', chatRoutes);
+app.use('/api', researchRoutes);
 
 // Health check
 app.get('/', (_req, res) => {

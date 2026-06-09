@@ -5,6 +5,7 @@ import { ConversationList } from '../components/ConversationList';
 import { useChat } from '../hooks/useChat';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { downloadModel, MODEL_VERSION } from '../services/modelDownload.service';
 
 export const ConversationScreen = () => {
@@ -13,9 +14,11 @@ export const ConversationScreen = () => {
   const [isDownloading, setIsDownloading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
 
-  useEffect(() => {
-    loadConversations();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadConversations();
+    }, [loadConversations])
+  );
 
   const handleSelect = () => {
     // Navigate back to the Chat tab screen

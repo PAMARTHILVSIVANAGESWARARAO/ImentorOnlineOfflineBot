@@ -35,6 +35,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="research"
+        options={{
+          title: 'Web Research',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "globe" : "globe-outline"} size={20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="history"
         options={{
           title: 'History',

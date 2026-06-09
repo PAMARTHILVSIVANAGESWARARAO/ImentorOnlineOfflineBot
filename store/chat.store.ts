@@ -19,6 +19,8 @@ interface ChatStore {
   isStreaming: boolean;
   isThinking: boolean;
   streamingText: string;
+  activeResearchSessionId: string | null;
+  activeResearchTopic: string | null;
 
   // Actions
   setConnected: (connected: boolean) => void;
@@ -40,6 +42,7 @@ interface ChatStore {
   setStreaming: (isStreaming: boolean) => void;
   setThinking: (isThinking: boolean) => void;
   setStreamingText: (text: string) => void;
+  setActiveResearchSession: (sessionId: string | null, topic: string | null) => void;
   resetChat: () => void;
 }
 
@@ -61,6 +64,8 @@ export const useChatStore = create<ChatStore>()(
       isStreaming: false,
       isThinking: false,
       streamingText: '',
+      activeResearchSessionId: null,
+      activeResearchTopic: null,
 
       setConnected: (connected) => set({ isConnected: connected }),
       setOfflineModelReady: (ready) => set({ offlineModelReady: ready }),
@@ -84,7 +89,8 @@ export const useChatStore = create<ChatStore>()(
       setStreaming: (isStreaming) => set({ isStreaming }),
       setThinking: (isThinking) => set({ isThinking }),
       setStreamingText: (streamingText) => set({ streamingText }),
-      resetChat: () => set({ activeConversation: null, messages: [], isStreaming: false, isThinking: false, streamingText: '' }),
+      setActiveResearchSession: (sessionId, topic) => set({ activeResearchSessionId: sessionId, activeResearchTopic: topic }),
+      resetChat: () => set({ activeConversation: null, messages: [], isStreaming: false, isThinking: false, streamingText: '', activeResearchSessionId: null, activeResearchTopic: null }),
     }),
     {
       name: 'imentor-chat-storage',
